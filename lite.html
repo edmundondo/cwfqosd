@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="app-version" content="1.0.0">
+<title>USA Free WiFi Tracker — Lite</title>
+<style>
+  body{margin:0;background:#0f1115;color:#eef0f3;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:20px 16px 50px;}
+  .wrap{max-width:640px;margin:0 auto;}
+  h1{font-size:24px;margin:0 0 6px;}
+  .eyebrow{color:#9aa3b2;font-size:12px;text-transform:uppercase;letter-spacing:.08em;}
+  p{color:#c9cfda;line-height:1.6;}
+  a{color:#5b8cff;}
+  .box{background:#171a21;border:1px solid #2a2f3a;border-radius:12px;padding:16px;margin:16px 0;}
+  .box h2{font-size:15px;margin:0 0 8px;color:#eef0f3;}
+  code{background:#1e2229;padding:1px 6px;border-radius:5px;}
+  footer{border-top:1px solid #2a2f3a;padding-top:16px;margin-top:30px;color:#9aa3b2;font-size:12px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">cwfqosd · lite / no-JavaScript version</div>
+  <h1>📶 USA Free WiFi Tracker</h1>
+  <p>
+    This is the no-script fallback for old phones, slow connections, or browsers with JavaScript
+    disabled. It can't run the live search the full app uses — see why below — but it still gets
+    you to a working answer.
+  </p>
+
+  <div class="box">
+    <h2>Why there's no offline spot list here</h2>
+    <p>
+      This tracker's sibling ISP-quality trackers can ship a static, no-JS provider table because
+      each one tracks a small, fixed list of licensed ISPs per country. Free WiFi doesn't work that
+      way — there's no fixed list; it's whatever's near <em>your</em> specific address right now,
+      pulled live from <a href="https://www.openstreetmap.org" target="_blank" rel="noopener">OpenStreetMap</a>.
+      A pre-built offline list would either be empty for most of the country or stale within days.
+      Honest tradeoff: the full app needs JavaScript to do that live lookup.
+    </p>
+  </div>
+
+  <div class="box">
+    <h2>What you can do right now</h2>
+    <p>
+      1. If your phone can open a link at all, open the
+      <a href="index.html">full USA Free WiFi Tracker</a> — it needs JavaScript but nothing else
+      (no account, no install).<br><br>
+      2. If you're on a very old device or truly offline, search your mobile carrier's own "free
+      WiFi near me" feature, or ask at any public library — nearly every US public library system
+      offers free WiFi during open hours.
+    </p>
+  </div>
+
+  <div class="box">
+    <h2>Rate a spot or report it down, by email</h2>
+    <p>
+      No JavaScript needed for this — just email the spot's name and city, your star rating (1–5),
+      and its current status (live / partial / down), and it'll be added the same way an in-app
+      submission would be:
+      <br><br>
+      <a href="mailto:edmundondo@gmail.com?subject=USA%20Free%20WiFi%20Tracker%20report&body=Spot%20name%3A%0ACity%2FZIP%3A%0AStar%20rating%20(1-5)%3A%0AStatus%20(live%2Fpartial%2Fdown)%3A%0AComment%3A">
+        edmundondo@gmail.com
+      </a>
+    </p>
+  </div>
+
+  <footer>
+    "Free" status on any spot is inferred from community-tagged map data and is not guaranteed —
+    always confirm with the venue. Public demo (<code>cwfqosd</code>) — no export/download tools
+    here by design.
+  </footer>
+</div>
+</body>
+</html>

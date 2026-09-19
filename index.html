@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="app-version" content="1.0.0">
+<title>USA Free WiFi Tracker</title>
+<meta name="description" content="Find free public WiFi anywhere in the USA by GPS, street address, city, or ZIP — and rate/report live status, crowdsourced. Public demo — cwfqosd.">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Supabase JS — free, open source. Only used if SUPABASE_CONFIG below is filled in; the app
+     runs fully in "local demo mode" (crowd reports saved to this browser only) otherwise. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1e2229; --border:#2a2f3a;
+    --text:#eef0f3; --muted:#9aa3b2; --accent:#3ddc97; --accent2:#5b8cff;
+    --warn:#f5b942; --danger:#ff6b6b; --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  a{color:var(--accent2);}
+  header{padding:20px 16px 12px;border-bottom:1px solid var(--border);background:linear-gradient(180deg,#141821,var(--bg));}
+  header .eyebrow{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.08em;}
+  header h1{margin:6px 0 4px;font-size:clamp(22px,4vw,30px);}
+  header p{margin:0;color:var(--muted);font-size:14px;max-width:720px;}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 16px;}
+  .notice{background:#132b22;border:1px solid #1f4a37;color:#bdf4dc;border-radius:var(--radius);padding:10px 14px;font-size:13px;margin:14px 0;}
+  .notice a{color:#bdf4dc;}
+
+  #oldBrowserBanner{display:none;background:#3a2a10;color:#e8b93f;border:1px solid #5c4419;border-radius:8px;padding:10px 14px;margin:12px auto 0;max-width:1068px;font-size:13px;}
+  #oldBrowserBanner a{color:#e8b93f;}
+
+  .backend-banner{max-width:1100px;margin:12px auto 0;padding:8px 14px;border-radius:8px;font-size:12.5px;border:1px solid var(--border);}
+  .backend-banner.mode-local{background:#20232b;color:var(--muted);}
+  .backend-banner.mode-connecting{background:#20232b;color:var(--warn);}
+  .backend-banner.mode-live{background:#12261d;color:var(--accent);border-color:#1f4a37;}
+  .backend-banner.mode-error{background:#2a1616;color:var(--danger);}
+
+  .search-panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin:16px 0;}
+  .search-row{display:flex;gap:8px;flex-wrap:wrap;}
+  .search-row input[type=text]{flex:1;min-width:220px;background:var(--panel2);border:1px solid var(--border);color:var(--text);padding:12px 14px;border-radius:10px;font-size:15px;}
+  .search-row input[type=text]:focus{outline:2px solid var(--accent2);}
+  button{cursor:pointer;border:none;border-radius:10px;font-size:14px;font-weight:600;padding:12px 16px;transition:transform .06s ease, opacity .15s;font-family:inherit;}
+  button:active{transform:scale(.97);}
+  button.primary{background:var(--accent2);color:#fff;}
+  button.locate{background:var(--accent);color:#06231a;}
+  button.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--border);}
+  button:disabled{opacity:.5;cursor:wait;}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;align-items:center;}
+  .controls label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  select{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:13px;font-family:inherit;}
+  .status-line{font-size:13px;color:var(--muted);margin-top:10px;min-height:18px;}
+  .status-line.err{color:var(--danger);}
+
+  .layout{display:grid;grid-template-columns:1.1fr .9fr;gap:16px;margin:16px 0 24px;}
+  @media (max-width:820px){.layout{grid-template-columns:1fr;}}
+
+  #map{height:420px;border-radius:var(--radius);border:1px solid var(--border);background:#111;}
+  .results-panel{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:12px;max-height:640px;overflow:auto;}
+  .results-head{display:flex;justify-content:space-between;align-items:center;padding:4px 6px 10px;border-bottom:1px solid var(--border);}
+  .results-head h2{font-size:15px;margin:0;}
+  .results-head span{font-size:12px;color:var(--muted);}
+
+  .spot{border-bottom:1px solid var(--border);padding:12px 6px;}
+  .spot:last-child{border-bottom:none;}
+  .spot-top{display:flex;justify-content:space-between;gap:8px;align-items:baseline;cursor:pointer;}
+  .spot-name{font-weight:600;font-size:14px;}
+  .spot-dist{font-size:12px;color:var(--accent);white-space:nowrap;}
+  .spot-meta{font-size:12px;color:var(--muted);margin-top:3px;cursor:pointer;}
+  .spot-crowd{font-size:12px;color:var(--warn);margin-top:4px;}
+  .badge{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.03em;padding:2px 7px;border-radius:20px;margin-right:6px;text-transform:uppercase;}
+  .badge.free{background:#12351f;color:var(--accent);}
+  .badge.maybe{background:#3a2f10;color:var(--warn);}
+  .badge.customers{background:#3a1b1b;color:var(--danger);}
+  .spot-actions{margin-top:8px;display:flex;gap:12px;align-items:center;}
+  .spot-actions a{font-size:12px;font-weight:600;text-decoration:none;}
+  .spot-actions .toggle-rate{font-size:12px;font-weight:600;color:var(--accent2);background:none;border:none;padding:0;cursor:pointer;}
+  .empty{padding:30px 10px;text-align:center;color:var(--muted);font-size:14px;}
+
+  /* CSS grid 0fr->1fr expand pattern -- never a fixed max-height (it clips growing content). */
+  .detail{display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s ease;margin-top:8px;}
+  .spot.open .detail{grid-template-rows:1fr;}
+  .detail-inner{overflow:hidden;min-height:0;}
+  .detail-box{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-top:2px;}
+  .stars{display:flex;gap:4px;}
+  .star-btn{background:none;border:none;font-size:22px;color:#454b58;cursor:pointer;padding:2px;line-height:1;}
+  .star-btn.filled{color:var(--warn);}
+  .status-pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+  .status-pill{padding:6px 12px;border-radius:999px;font-size:12px;font-weight:700;border:1px solid var(--border);background:var(--panel);color:var(--muted);cursor:pointer;}
+  .status-pill.sel-live{background:rgba(61,220,151,.15);color:var(--accent);border-color:rgba(61,220,151,.4);}
+  .status-pill.sel-partial{background:rgba(245,185,66,.15);color:var(--warn);border-color:rgba(245,185,66,.4);}
+  .status-pill.sel-down{background:rgba(255,107,107,.15);color:var(--danger);border-color:rgba(255,107,107,.4);}
+  .status-pill.sel-unconfirmed{background:rgba(154,163,178,.15);color:var(--muted);}
+  textarea{width:100%;background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 10px;font-size:13px;margin-top:10px;font-family:inherit;resize:vertical;min-height:50px;}
+  .detail-submit-row{display:flex;justify-content:flex-end;gap:8px;margin-top:10px;}
+  .field-label{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-top:6px;display:block;}
+
+  .matokipedo-footer{border-top:1px solid var(--border);padding:20px 16px 40px;color:var(--muted);font-size:12px;text-align:center;}
+  .matokipedo-brand{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:10px;}
+  .matokipedo-logo{height:22px;width:auto;border-radius:4px;}
+  .matokipedo-tagline{font-size:12px;color:var(--muted);}
+  .matokipedo-footer a{color:var(--accent2);}
+</style>
+</head>
+<body>
+
+<div id="oldBrowserBanner">
+  This page uses features your browser doesn't fully support, so parts of it may not work right. Try updating your
+  browser, or use the <a href="lite.html">Lite version</a> — it works everywhere, no JavaScript required.
+</div>
+<script>
+(function(){
+  try{
+    var ok = window.fetch && window.Promise && window.localStorage &&
+      Array.prototype.includes && Object.assign && window.CSS && CSS.supports &&
+      CSS.supports("display","grid") && CSS.supports("display","flex");
+    if(!ok){ document.getElementById("oldBrowserBanner").style.display = "block"; }
+  }catch(e){
+    var b = document.getElementById("oldBrowserBanner");
+    if(b){ b.style.display = "block"; }
+  }
+})();
+</script>
+
+<header>
+  <div class="wrap">
+    <div class="eyebrow">cwfqosd · public demo · OpenStreetMap · Nominatim · Overpass · Zippopotam — free &amp; open, no API keys</div>
+    <h1>📶 USA Free WiFi Tracker</h1>
+    <p>Find free public WiFi near any street address, city, or ZIP code in the United States, or share your location — then rate it and report live status for the next person. Crowdsourced, same model as this project's sibling ISP-QoS trackers.</p>
+  </div>
+</header>
+
+<div id="backendBanner" class="backend-banner mode-local">Local demo mode</div>
+
+<div class="wrap">
+  <div class="notice">
+    📍 Your location, if you share it, stays in your browser — only used to calculate distances and center the map, never uploaded. Search text (address/city/ZIP) goes only to the free OpenStreetMap geocoder. Ratings and status reports you leave are shared with everyone once a backend is connected (see footer) — in local demo mode they're saved only to this browser.
+  </div>
+
+  <div class="search-panel">
+    <div class="search-row">
+      <input id="searchInput" type="text" placeholder="Street address, city, or ZIP — e.g. &quot;123 Main St, Austin, TX&quot; or &quot;10001&quot;" autocomplete="off">
+      <button class="primary" id="searchBtn">Search</button>
+      <button class="locate" id="locateBtn">📍 Use my location</button>
+    </div>
+    <div class="controls">
+      <label>Radius
+        <select id="radiusSelect">
+          <option value="0.5">0.5 mi</option>
+          <option value="1" selected>1 mi</option>
+          <option value="2">2 mi</option>
+          <option value="5">5 mi</option>
+        </select>
+      </label>
+      <label>Type
+        <select id="typeSelect">
+          <option value="all">All types</option>
+          <option value="cafe">Cafés &amp; Restaurants</option>
+          <option value="library">Libraries</option>
+          <option value="civic">Government &amp; Community</option>
+          <option value="transit">Transit</option>
+          <option value="park">Parks</option>
+          <option value="retail">Retail</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label><input type="checkbox" id="showPaid"> Also show "customers only" spots</label>
+    </div>
+    <div class="status-line" id="statusLine">Search an address/city/ZIP, or tap "Use my location" to begin.</div>
+  </div>
+
+  <div class="layout">
+    <div id="map"></div>
+    <div class="results-panel">
+      <div class="results-head">
+        <h2>Nearby free WiFi</h2>
+        <span id="resultCount">0 spots</span>
+      </div>
+      <div id="resultsList"><div class="empty">No search yet — results will appear here.</div></div>
+    </div>
+  </div>
+</div>
+
+<footer class="matokipedo-footer">
+  <div class="matokipedo-brand">
+    <img src="matokipedo-logo.jpg" alt="Matokipedo" class="matokipedo-logo" onerror="this.style.display='none'">
+    <div class="matokipedo-tagline">Live infrastructure monitoring by Matokipedo</div>
+  </div>
+  Map data &amp; hotspot tags © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>, ODbL.
+  Geocoding by <a href="https://nominatim.org" target="_blank" rel="noopener">Nominatim</a> &amp; <a href="https://www.zippopotam.us" target="_blank" rel="noopener">Zippopotam</a>. Live queries by <a href="https://overpass-api.de" target="_blank" rel="noopener">Overpass API</a>.
+  "Free" status is inferred from community-tagged data and is not guaranteed — always confirm with the venue.
+  This is the public demo (<code>cwfqosd</code>) — no export/download tools here by design; see the privileged backend for analytics and exports.
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- site identity — verify this matches this repo before calling it done ----------
+  const SITE_ID = "us";
+
+  /* =========================================================================
+     BACKEND — Supabase when configured, localStorage "local demo mode" otherwise.
+     Same convention as this project's ISP-QoS demo sites: fill in SUPABASE_CONFIG
+     and everything below switches from local-only to shared automatically.
+     ========================================================================= */
+  const SUPABASE_CONFIG = {
+    url: "YOUR_SUPABASE_PROJECT_URL",        // e.g. "https://abcdefghijk.supabase.co"
+    anonKey: "YOUR_SUPABASE_ANON_PUBLIC_KEY" // the "anon public" API key, safe for client-side use
+  };
+  const BACKEND_CONFIGURED = SUPABASE_CONFIG.url.indexOf("http") === 0
+    && SUPABASE_CONFIG.anonKey && SUPABASE_CONFIG.anonKey.indexOf("YOUR_") !== 0;
+
+  let supa = null;
+  if (BACKEND_CONFIGURED && window.supabase){
+    supa = window.supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey);
+  }
+
+  const LS_KEYS = { qos: "cwfqos_qos_reports", status: "cwfqos_status_reports" };
+  function lsGet(key){ try{ return JSON.parse(localStorage.getItem(key) || "[]"); }catch(e){ return []; } }
+  function lsSet(key, arr){ localStorage.setItem(key, JSON.stringify(arr)); }
+  function lsAdd(key, item){ const arr = lsGet(key); arr.push(item); lsSet(key, arr); return arr; }
+
+  let backendMode = BACKEND_CONFIGURED ? "connecting" : "local";
+  let remoteCache = { qos: [], status: [] };
+
+  async function initBackend(){
+    const banner = document.getElementById("backendBanner");
+    if (!BACKEND_CONFIGURED || !supa){
+      backendMode = "local";
+      banner.className = "backend-banner mode-local";
+      banner.textContent = "🟡 Local demo mode — ratings/status reports are saved only in this browser. See the footer / README to connect a free Supabase backend and make them shared.";
+      return;
+    }
+    banner.className = "backend-banner mode-connecting";
+    banner.textContent = "Connecting to shared backend…";
+    try{
+      const tables = ["wifi_qos_reports", "wifi_status_reports"];
+      const results = await Promise.all(tables.map(tb =>
+        supa.from(tb).select("*").eq("site", SITE_ID).order("created_at", { ascending: false }).limit(1000)
+      ));
+      results.forEach((r, i) => {
+        const key = ["qos", "status"][i];
+        if (!r.error) remoteCache[key] = r.data || [];
+      });
+      backendMode = "live";
+      banner.className = "backend-banner mode-live";
+      banner.textContent = "🟢 Shared mode — ratings and status reports here are visible to everyone.";
+    } catch(e){
+      backendMode = "error";
+      banner.className = "backend-banner mode-error";
+      banner.textContent = "⚠️ Couldn't reach the shared backend — falling back to local demo mode for this session.";
+    }
+  }
+
+  function getReports(kind){
+    return backendMode === "live" ? remoteCache[kind] : lsGet(LS_KEYS[kind]);
+  }
+  async function addReport(kind, row){
+    row.site = SITE_ID;
+    row.created_at = row.created_at || new Date().toISOString();
+    if (backendMode === "live" && supa){
+      const table = { qos: "wifi_qos_reports", status: "wifi_status_reports" }[kind];
+      const { error } = await supa.from(table).insert(row);
+      if (!error) remoteCache[kind].unshift(row);
+      else lsAdd(LS_KEYS[kind], row);
+    } else {
+      lsAdd(LS_KEYS[kind], row);
+    }
+  }
+
+  function crowdSummary(osmId){
+    const qos = getReports("qos").filter(r => r.osm_id === osmId);
+    const status = getReports("status").filter(r => r.osm_id === osmId);
+    let out = [];
+    if (qos.length){
+      const avg = qos.reduce((s, r) => s + (r.stars || 0), 0) / qos.length;
+      out.push("★" + avg.toFixed(1) + " (" + qos.length + " rating" + (qos.length === 1 ? "" : "s") + ")");
+    }
+    if (status.length){
+      const latest = status.slice().sort((a, b) => new Date(b.created_at) - new Date(a.created_at))[0];
+      out.push("Status: " + STATUS_LABEL[latest.status] + " (" + timeAgo(latest.created_at) + ")");
+    }
+    return out.join(" · ");
+  }
+
+  function timeAgo(iso){
+    const s = Math.max(1, Math.round((Date.now() - new Date(iso).getTime()) / 1000));
+    if (s < 60) return s + "s ago";
+    const m = Math.round(s / 60); if (m < 60) return m + "m ago";
+    const h = Math.round(m / 60); if (h < 24) return h + "h ago";
+    return Math.round(h / 24) + "d ago";
+  }
+
+  // ---------- config ----------
+  const NOMINATIM_URL = "https://nominatim.openstreetmap.org/search";
+  const OVERPASS_URLS = [
+    "https://overpass-api.de/api/interpreter",
+    "https://overpass.kumi.systems/api/interpreter"
+  ];
+  const MILES_TO_METERS = 1609.34;
+  const CACHE_TTL_MS = 15 * 60 * 1000;
+  const ZIP_RE = /^\d{5}(-\d{4})?$/;
+  const STATUS_LABEL = { live: "Live", partial: "Partial", down: "Down", unconfirmed: "Unconfirmed" };
+
+  // ---------- state ----------
+  let map, userMarker, resultMarkers = [];
+  let allSpots = [];
+  let currentResults = [];
+  let searchCenter = null;
+
+  // ---------- dom ----------
+  const $ = (id) => document.getElementById(id);
+  const searchInput = $("searchInput");
+  const searchBtn = $("searchBtn");
+  const locateBtn = $("locateBtn");
+  const radiusSelect = $("radiusSelect");
+  const typeSelect = $("typeSelect");
+  const showPaid = $("showPaid");
+  const statusLine = $("statusLine");
+  const resultsList = $("resultsList");
+  const resultCount = $("resultCount");
+
+  function initMap(){
+    map = L.map("map", { zoomControl: true }).setView([39.8283, -98.5795], 4);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors"
+    }).addTo(map);
+  }
+
+  function setStatus(msg, isErr){
+    statusLine.textContent = msg;
+    statusLine.className = "status-line" + (isErr ? " err" : "");
+  }
+
+  function useMyLocation(){
+    if (!navigator.geolocation){
+      setStatus("Geolocation isn't supported on this browser/device.", true);
+      return;
+    }
+    setStatus("Requesting your location…");
+    locateBtn.disabled = true;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        locateBtn.disabled = false;
+        const { latitude, longitude } = pos.coords;
+        searchCenter = { lat: latitude, lon: longitude, label: "your location" };
+        searchInput.value = "";
+        setStatus("Got your location. Searching nearby…");
+        runSearch();
+      },
+      (err) => {
+        locateBtn.disabled = false;
+        setStatus("Couldn't get your location (" + err.message + "). Try searching an address instead.", true);
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
+  }
+
+  async function geocodeZip(zip5){
+    try{
+      const res = await fetch("https://api.zippopotam.us/us/" + zip5);
+      if (!res.ok) return null;
+      const data = await res.json();
+      const place = data.places && data.places[0];
+      if (!place) return null;
+      return {
+        lat: parseFloat(place.latitude),
+        lon: parseFloat(place.longitude),
+        label: place["place name"] + ", " + place["state abbreviation"] + " " + zip5
+      };
+    } catch(e){ return null; }
+  }
+
+  async function geocodeAttempt(params){
+    const usp = new URLSearchParams({ format: "json", limit: "1", addressdetails: "1", countrycodes: "us", ...params });
+    const res = await fetch(NOMINATIM_URL + "?" + usp.toString(), { headers: { "Accept": "application/json" } });
+    if (!res.ok) throw new Error("Geocoding service unavailable (" + res.status + ")");
+    return res.json();
+  }
+
+  async function geocode(query){
+    const trimmed = query.trim();
+    const zipMatch = trimmed.match(ZIP_RE);
+
+    if (zipMatch){
+      const zipResult = await geocodeZip(zipMatch[0].slice(0, 5));
+      if (zipResult) return zipResult;
+    }
+
+    const attempts = [];
+    if (zipMatch) attempts.push({ postalcode: zipMatch[0].slice(0, 5) });
+    attempts.push({ q: trimmed });
+    if (!zipMatch) attempts.push({ q: trimmed + ", USA" });
+
+    for (const params of attempts){
+      const data = await geocodeAttempt(params);
+      if (data.length){
+        const top = data[0];
+        return { lat: parseFloat(top.lat), lon: parseFloat(top.lon), label: top.display_name };
+      }
+    }
+    throw new Error('No match found for "' + query + '". Try a fuller address, "city, state", or double-check the ZIP.');
+  }
+
+  function buildOverpassQuery(lat, lon, radiusMeters){
+    return `[out:json][timeout:25];(
+      node(around:${radiusMeters},${lat},${lon})["internet_access"];
+      way(around:${radiusMeters},${lat},${lon})["internet_access"];
+      node(around:${radiusMeters},${lat},${lon})["amenity"="library"];
+      node(around:${radiusMeters},${lat},${lon})["amenity"="townhall"];
+      node(around:${radiusMeters},${lat},${lon})["amenity"="community_centre"];
+    );out center tags;`;
+  }
+
+  async function fetchOverpass(query){
+    let lastErr;
+    for (const base of OVERPASS_URLS){
+      try{
+        const res = await fetch(base, { method: "POST", body: "data=" + encodeURIComponent(query) });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return await res.json();
+      } catch(e){ lastErr = e; }
+    }
+    throw new Error("Hotspot data service is busy right now — please try again in a moment. (" + (lastErr && lastErr.message) + ")");
+  }
+
+  function cacheKey(lat, lon, radiusMiles){ return "cwfqos_cache_" + lat.toFixed(3) + "_" + lon.toFixed(3) + "_" + radiusMiles; }
+  function getCache(key){
+    try{
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+      const obj = JSON.parse(raw);
+      if (Date.now() - obj.ts > CACHE_TTL_MS) return null;
+      return obj.data;
+    } catch(e){ return null; }
+  }
+  function setCache(key, data){
+    try{ localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch(e){}
+  }
+
+  function haversineMiles(lat1, lon1, lat2, lon2){
+    const R = 3958.8;
+    const dLat = (lat2 - lat1) * Math.PI/180, dLon = (lon2 - lon1) * Math.PI/180;
+    const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  }
+
+  function freeStatus(tags){
+    const fee = (tags.fee || "").toLowerCase();
+    if (fee === "no") return "free";
+    if (fee === "yes" || fee === "customers" || fee === "members") return "customers";
+    if (tags.amenity === "library" || tags.amenity === "townhall" || tags.amenity === "community_centre") return "free";
+    return "maybe";
+  }
+
+  function categorize(tags){
+    const a = tags.amenity, s = tags.shop, r = tags.railway || tags.public_transport, l = tags.leisure;
+    if (a === "cafe" || a === "restaurant" || a === "fast_food" || a === "bar" || a === "pub") return "cafe";
+    if (a === "library") return "library";
+    if (a === "townhall" || a === "community_centre" || a === "social_facility") return "civic";
+    if (r || a === "bus_station") return "transit";
+    if (l === "park") return "park";
+    if (s) return "retail";
+    return "other";
+  }
+
+  function categoryLabel(cat){
+    return { cafe:"Café / Restaurant", library:"Library", civic:"Government / Community",
+      transit:"Transit", park:"Park", retail:"Retail", other:"Other" }[cat] || "Other";
+  }
+
+  function addressFromTags(tags){
+    const parts = [tags["addr:housenumber"], tags["addr:street"]].filter(Boolean).join(" ");
+    const cityLine = [tags["addr:city"], tags["addr:state"], tags["addr:postcode"]].filter(Boolean).join(", ");
+    const full = [parts, cityLine].filter(Boolean).join(", ");
+    return full || null;
+  }
+
+  function elementsToSpots(elements, center){
+    const spots = [];
+    for (const el of elements){
+      const tags = el.tags || {};
+      const lat = el.lat != null ? el.lat : (el.center ? el.center.lat : null);
+      const lon = el.lon != null ? el.lon : (el.center ? el.center.lon : null);
+      if (lat == null || lon == null) continue;
+      const name = tags.name || categoryLabel(categorize(tags));
+      spots.push({
+        id: el.type + "/" + el.id,
+        name, category: categorize(tags), free: freeStatus(tags),
+        address: addressFromTags(tags), opening_hours: tags.opening_hours || null,
+        lat, lon, distance: haversineMiles(center.lat, center.lon, lat, lon)
+      });
+    }
+    const seen = new Set();
+    const deduped = spots.filter(s => {
+      const key = s.name + "|" + s.lat.toFixed(4) + "|" + s.lon.toFixed(4);
+      if (seen.has(key)) return false;
+      seen.add(key); return true;
+    });
+    deduped.sort((a, b) => a.distance - b.distance);
+    return deduped;
+  }
+
+  function clearMarkers(){ resultMarkers.forEach(m => map.removeLayer(m)); resultMarkers = []; }
+
+  function renderMap(center, spots){
+    clearMarkers();
+    if (userMarker) map.removeLayer(userMarker);
+    userMarker = L.circleMarker([center.lat, center.lon], { radius:8, color:"#5b8cff", fillColor:"#5b8cff", fillOpacity:.9 })
+      .addTo(map).bindPopup("Search center");
+    spots.forEach(s => {
+      const color = s.free === "free" ? "#3ddc97" : s.free === "maybe" ? "#f5b942" : "#ff6b6b";
+      const marker = L.circleMarker([s.lat, s.lon], { radius:7, color, fillColor:color, fillOpacity:.85 })
+        .addTo(map)
+        .bindPopup(`<strong>${escapeHtml(s.name)}</strong><br>${categoryLabel(s.category)}<br>${s.distance.toFixed(2)} mi away`);
+      resultMarkers.push(marker);
+    });
+    const bounds = L.latLngBounds([[center.lat, center.lon], ...spots.map(s => [s.lat, s.lon])]);
+    if (spots.length) map.fitBounds(bounds.pad(0.2)); else map.setView([center.lat, center.lon], 14);
+  }
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+  }
+
+  function badgeFor(free){
+    if (free === "free") return '<span class="badge free">Free</span>';
+    if (free === "customers") return '<span class="badge customers">Customers only</span>';
+    return '<span class="badge maybe">Likely free</span>';
+  }
+
+  function renderList(spots){
+    const typeFilter = typeSelect.value;
+    const includePaid = showPaid.checked;
+    const filtered = spots.filter(s => {
+      if (!includePaid && s.free === "customers") return false;
+      if (typeFilter !== "all" && s.category !== typeFilter) return false;
+      return true;
+    });
+
+    resultCount.textContent = filtered.length + " spot" + (filtered.length === 1 ? "" : "s");
+
+    if (!filtered.length){
+      resultsList.innerHTML = '<div class="empty">No matching WiFi spots found in this radius. Try a bigger radius or a different type filter.</div>';
+      currentResults = [];
+      return;
+    }
+
+    resultsList.innerHTML = filtered.map((s, i) => {
+      const crowd = crowdSummary(s.id);
+      return `
+      <div class="spot" data-idx="${i}" id="spot-${i}">
+        <div class="spot-top" data-role="pan">
+          <div class="spot-name">${escapeHtml(s.name)}</div>
+          <div class="spot-dist">${s.distance.toFixed(2)} mi</div>
+        </div>
+        <div class="spot-meta" data-role="pan">${badgeFor(s.free)}${categoryLabel(s.category)}${s.address ? " · " + escapeHtml(s.address) : ""}</div>
+        ${s.opening_hours ? `<div class="spot-meta">🕒 ${escapeHtml(s.opening_hours)}</div>` : ""}
+        ${crowd ? `<div class="spot-crowd">${escapeHtml(crowd)}</div>` : ""}
+        <div class="spot-actions">
+          <a href="https://www.google.com/maps/dir/?api=1&destination=${s.lat},${s.lon}" target="_blank" rel="noopener">🧭 Directions</a>
+          <button class="toggle-rate" data-role="toggle">⭐ Rate / report status ▾</button>
+        </div>
+        <div class="detail"><div class="detail-inner">
+          <div class="detail-box">
+            <span class="field-label">Your rating</span>
+            <div class="stars" data-role="stars">
+              ${[1,2,3,4,5].map(n => `<button type="button" class="star-btn" data-n="${n}">★</button>`).join("")}
+            </div>
+            <span class="field-label">Live status right now</span>
+            <div class="status-pills" data-role="statuspills">
+              ${["live","partial","down","unconfirmed"].map(st =>
+                `<button type="button" class="status-pill" data-status="${st}">${STATUS_LABEL[st]}</button>`).join("")}
+            </div>
+            <span class="field-label">Comment (optional)</span>
+            <textarea placeholder="Slow but working, password needed at counter, etc." data-role="comment"></textarea>
+            <div class="detail-submit-row">
+              <button class="ghost" data-role="cancel">Cancel</button>
+              <button class="primary" data-role="submit">Submit</button>
+            </div>
+          </div>
+        </div></div>
+      </div>
+    `;
+    }).join("");
+
+    resultsList.querySelectorAll(".spot").forEach((el, idx) => {
+      const spot = filtered[idx];
+
+      el.querySelectorAll('[data-role="pan"]').forEach(panEl => {
+        panEl.addEventListener("click", () => {
+          map.setView([spot.lat, spot.lon], 17);
+          const marker = resultMarkers.find(m => {
+            const ll = m.getLatLng();
+            return Math.abs(ll.lat - spot.lat) < 1e-6 && Math.abs(ll.lng - spot.lon) < 1e-6;
+          });
+          if (marker) marker.openPopup();
+        });
+      });
+
+      const toggleBtn = el.querySelector('[data-role="toggle"]');
+      toggleBtn.addEventListener("click", () => {
+        el.classList.toggle("open");
+        toggleBtn.textContent = el.classList.contains("open") ? "⭐ Rate / report status ▲" : "⭐ Rate / report status ▾";
+      });
+      el.querySelector('[data-role="cancel"]').addEventListener("click", () => {
+        el.classList.remove("open");
+        toggleBtn.textContent = "⭐ Rate / report status ▾";
+      });
+
+      let selectedStars = 0;
+      const starBtns = el.querySelectorAll('[data-role="stars"] .star-btn');
+      starBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+          selectedStars = parseInt(btn.dataset.n, 10);
+          starBtns.forEach(b => b.classList.toggle("filled", parseInt(b.dataset.n, 10) <= selectedStars));
+        });
+      });
+
+      let selectedStatus = null;
+      const pillBtns = el.querySelectorAll('[data-role="statuspills"] .status-pill');
+      pillBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+          selectedStatus = btn.dataset.status;
+          pillBtns.forEach(b => b.classList.remove("sel-live", "sel-partial", "sel-down", "sel-unconfirmed"));
+          btn.classList.add("sel-" + selectedStatus);
+        });
+      });
+
+      el.querySelector('[data-role="submit"]').addEventListener("click", async (e) => {
+        const submitBtn = e.currentTarget;
+        if (!selectedStars && !selectedStatus){
+          setStatus("Pick a star rating and/or a status before submitting.", true);
+          return;
+        }
+        submitBtn.disabled = true;
+        const comment = el.querySelector('[data-role="comment"]').value.trim();
+        try{
+          if (selectedStars){
+            await addReport("qos", {
+              osm_id: spot.id, spot_name: spot.name, category: spot.category,
+              lat: spot.lat, lon: spot.lon, search_location: (searchCenter && searchCenter.label) || null,
+              stars: selectedStars, comment: comment || null
+            });
+          }
+          if (selectedStatus){
+            await addReport("status", {
+              osm_id: spot.id, spot_name: spot.name, lat: spot.lat, lon: spot.lon, status: selectedStatus
+            });
+          }
+          setStatus("Thanks — your report was saved" + (backendMode === "live" ? " and shared." : " to this browser (local demo mode)."));
+          renderList(allSpots);
+        } catch(err){
+          setStatus("Couldn't save your report: " + (err.message || err), true);
+          submitBtn.disabled = false;
+        }
+      });
+    });
+
+    currentResults = filtered;
+  }
+
+  async function runSearch(){
+    try{
+      const query = searchInput.value.trim();
+      searchBtn.disabled = true;
+
+      if (query){
+        setStatus('Looking up "' + query + '"…');
+        searchCenter = await geocode(query);
+      } else if (!searchCenter){
+        setStatus('Type an address, city, or ZIP — or tap "Use my location".', true);
+        searchBtn.disabled = false;
+        return;
+      }
+
+      const radiusMiles = parseFloat(radiusSelect.value);
+      const radiusMeters = Math.round(radiusMiles * MILES_TO_METERS);
+      setStatus("Searching for free WiFi within " + radiusMiles + " mi of " + (searchCenter.label || "your location") + "…");
+
+      const key = cacheKey(searchCenter.lat, searchCenter.lon, radiusMiles);
+      let json = getCache(key);
+      if (!json){
+        const q = buildOverpassQuery(searchCenter.lat, searchCenter.lon, radiusMeters);
+        json = await fetchOverpass(q);
+        setCache(key, json);
+      }
+
+      const spots = elementsToSpots(json.elements || [], searchCenter);
+      allSpots = spots;
+      renderMap(searchCenter, spots);
+      renderList(allSpots);
+
+      setStatus(spots.length
+        ? "Found " + spots.length + " WiFi spot" + (spots.length === 1 ? "" : "s") + " near " + (searchCenter.label || "your location") + "."
+        : "No tagged WiFi spots found nearby yet — OpenStreetMap coverage varies by area. Try a bigger radius.");
+    } catch(err){
+      setStatus(err.message || "Something went wrong.", true);
+    } finally {
+      searchBtn.disabled = false;
+    }
+  }
+
+  // ---------- wire up ----------
+  initMap();
+  initBackend();
+  searchBtn.addEventListener("click", runSearch);
+  searchInput.addEventListener("keydown", (e) => { if (e.key === "Enter") runSearch(); });
+  locateBtn.addEventListener("click", useMyLocation);
+  radiusSelect.addEventListener("change", () => { if (searchCenter) runSearch(); });
+  typeSelect.addEventListener("change", () => renderList(allSpots));
+  showPaid.addEventListener("change", () => renderList(allSpots));
+
+})();
+</script>
+</body>
+</html>
