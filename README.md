@@ -32,15 +32,14 @@ push these files to a repo and enable Pages on `main`.
 
 ## Local demo mode vs. shared mode
 
-- **Local demo mode (default).** Every rating and status report is saved only in your own browser
-  via `localStorage`. Nothing leaves your device.
-- **Shared mode.** Connect a free [Supabase](https://supabase.com) project (see `cwfqosp/schema.sql`
-  and `cwfqosp/README.md` for the migration + setup steps) and fill in the `SUPABASE_CONFIG` object
-  near the top of `index.html`'s `<script>` block with your Project URL and `anon public` key. Every
-  visitor's reports are then pooled and visible to everyone, and `cwfqosp`'s admin app can read and
-  export them.
-
-If `SUPABASE_CONFIG` is left as the placeholder values, the app quietly stays in local demo mode.
+- **Local demo mode.** Every rating and status report is saved only in your own browser via
+  `localStorage`. Nothing leaves your device. (This is what happens if `SUPABASE_CONFIG` is ever
+  reset to placeholder values.)
+- **Shared mode — currently active.** `SUPABASE_CONFIG` is wired to the shared `zwispqosdb`
+  Supabase project (same one the `*ispqos*` ISP-tracker family uses). Every visitor's ratings and
+  status reports are pooled and visible to everyone, and `cwfqosp`'s admin app can read, moderate,
+  and export them. See `cwfqosp/README.md` for the setup record and `cwfqosp/schema.sql` for the
+  migration that was actually applied.
 
 ## No export/download tools here, by design
 

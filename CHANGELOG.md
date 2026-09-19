@@ -3,6 +3,12 @@
 All notable changes to `cwfqosd` are documented here, in the
 [Keep a Changelog](https://keepachangelog.com/) style already used across the `*ispqos*` family.
 
+## [1.0.1] - 2026-09-19
+
+### Changed
+- `SUPABASE_CONFIG` wired to the shared `zwispqosdb` project — app now runs in shared mode by
+  default instead of local demo mode.
+
 ## [1.0.0] - 2026-09-19
 
 ### Added
