@@ -3,6 +3,34 @@
 All notable changes to `cwfqosd` are documented here, in the
 [Keep a Changelog](https://keepachangelog.com/) style already used across the `*ispqos*` family.
 
+## [1.1.0] - 2026-09-21
+
+### Added
+- "Use my location" pin is now draggable, with the device's own reported
+  accuracy radius drawn on the map as a shaded circle. There's no separate
+  "Apple Maps" positioning API a website can call for a more accurate device
+  fix — on Safari/macOS/iOS the standard geolocation call already routes
+  through Apple's own Location Services, so it's already the best fix the
+  OS will hand to a page. This makes a wide-uncertainty fix visible and
+  correctable instead of silently trusted; dragging the pin re-searches
+  from the corrected point.
+- Added the Matokipedo logo asset (`matokipedo-logo.jpg`) — the footer
+  `<img>` referenced it from the start but the file didn't exist, so the
+  badge was silently hiding via its `onerror` fallback.
+
+### Changed
+- Footer stripped to the Matokipedo brand row only, per explicit request —
+  the OSM/Nominatim/Overpass attribution and "not guaranteed" / demo-scope
+  disclaimer text was removed entirely. Flagged before doing this that
+  Nominatim/Overpass usage policies expect visible attribution and that
+  removing it risks rate-limiting/blocking; proceeding was an explicit
+  choice, not an oversight.
+
+Also note: this file's own version history had drifted from the page's
+`<meta name="app-version">` tag (CHANGELOG said 1.0.1, the tag still said
+1.0.0) before this entry — corrected as part of this release, not a
+separate fix.
+
 ## [1.0.1] - 2026-09-19
 
 ### Changed
