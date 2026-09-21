@@ -103,6 +103,10 @@
   .matokipedo-logo{height:22px;width:auto;border-radius:4px;}
   .matokipedo-tagline{font-size:12px;color:var(--muted);}
   .matokipedo-footer a{color:var(--accent2);}
+
+  .user-loc-marker{cursor:grab;}
+  .user-loc-marker:active{cursor:grabbing;}
+  .user-loc-dot{width:16px;height:16px;border-radius:50%;background:#5b8cff;border:3px solid #fff;box-shadow:0 0 0 2px rgba(91,140,255,.55);}
 </style>
 </head>
 <body>
@@ -307,7 +311,7 @@
   const STATUS_LABEL = { live: "Live", partial: "Partial", down: "Down", unconfirmed: "Unconfirmed" };
 
   // ---------- state ----------
-  let map, userMarker, resultMarkers = [];
+  let map, userMarker, accuracyCircle, resultMarkers = [];
   let allSpots = [];
   let currentResults = [];
   let searchCenter = null;
@@ -347,10 +351,22 @@
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         locateBtn.disabled = false;
-        const { latitude, longitude } = pos.coords;
-        searchCenter = { lat: latitude, lon: longitude, label: "your location" };
+        const { latitude, longitude, accuracy } = pos.coords;
+        // fromGeolocation flags this center as adjustable — see renderMap(). There's no separate
+        // "Apple Maps" positioning API a website can call instead: on Safari/macOS/iOS this same
+        // browser Geolocation call already goes through Apple's own Location Services (WiFi/GPS
+        // positioning), so it's already the most accurate fix the OS can hand to a web page. The
+        // `accuracy` value below is that fix's own reported uncertainty radius, in meters — when
+        // it's large, that's the device/environment's positioning limit, not this app under- or
+        // over-reporting. The draggable pin exists specifically so a wide-uncertainty fix doesn't
+        // block testing: correct it once and every search after uses the corrected point.
+        searchCenter = { lat: latitude, lon: longitude, label: "your location", fromGeolocation: true, accuracyM: accuracy };
         searchInput.value = "";
-        setStatus("Got your location. Searching nearby…");
+        const accuracyFt = Math.round(accuracy * 3.28084);
+        setStatus(
+          "Got your location (accurate to ~" + accuracyFt + " ft — the shaded circle on the map). " +
+          "If the pin looks off, drag it to your real spot; searches will use the corrected point. Searching nearby…"
+        );
         runSearch();
       },
       (err) => {
@@ -511,8 +527,38 @@
   function renderMap(center, spots){
     clearMarkers();
     if (userMarker) map.removeLayer(userMarker);
-    userMarker = L.circleMarker([center.lat, center.lon], { radius:8, color:"#5b8cff", fillColor:"#5b8cff", fillOpacity:.9 })
-      .addTo(map).bindPopup("Search center");
+    if (accuracyCircle){ map.removeLayer(accuracyCircle); accuracyCircle = null; }
+
+    if (center.fromGeolocation){
+      // Draggable pin + a real accuracy circle (radius = the device's own reported uncertainty,
+      // in meters) — lets a wide GPS/WiFi-positioning fix be corrected by hand instead of quietly
+      // trusted. Address-search centers below stay a plain (non-draggable) circleMarker, since a
+      // geocoded address doesn't carry a device accuracy figure to correct against.
+      userMarker = L.marker([center.lat, center.lon], {
+        draggable: true,
+        icon: L.divIcon({
+          className: "user-loc-marker",
+          html: '<div class="user-loc-dot"></div>',
+          iconSize: [18, 18],
+          iconAnchor: [9, 9]
+        })
+      }).addTo(map).bindPopup("Your location — drag to correct if this looks off");
+      if (center.accuracyM){
+        accuracyCircle = L.circle([center.lat, center.lon], {
+          radius: center.accuracyM, color: "#5b8cff", weight: 1, fillColor: "#5b8cff", fillOpacity: .08
+        }).addTo(map);
+      }
+      userMarker.on("dragend", () => {
+        const pos = userMarker.getLatLng();
+        searchCenter = { lat: pos.lat, lon: pos.lng, label: "your location (adjusted)", fromGeolocation: true };
+        setStatus("Location adjusted. Searching nearby…");
+        runSearch();
+      });
+    } else {
+      userMarker = L.circleMarker([center.lat, center.lon], { radius:8, color:"#5b8cff", fillColor:"#5b8cff", fillOpacity:.9 })
+        .addTo(map).bindPopup("Search center");
+    }
+
     spots.forEach(s => {
       const color = s.free === "free" ? "#3ddc97" : s.free === "maybe" ? "#f5b942" : "#ff6b6b";
       const marker = L.circleMarker([s.lat, s.lon], { radius:7, color, fillColor:color, fillOpacity:.85 })
