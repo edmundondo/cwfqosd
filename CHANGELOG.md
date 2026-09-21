@@ -3,6 +3,18 @@
 All notable changes to `cwfqosd` are documented here, in the
 [Keep a Changelog](https://keepachangelog.com/) style already used across the `*ispqos*` family.
 
+## [1.3.0] - 2026-09-21
+
+### Added
+- "Directions via" map-provider picker (Apple Maps / Google Maps / Waze / MapQuest /
+  OpenStreetMap) on the search controls row, same pattern as `wifi-quality-app`'s
+  `mapLink()`/`detectDefaultMapProvider()`. Every spot's "🧭 Directions" link had been hardcoded
+  to Google Maps only — this was part of Ed's original spec ("switch maps... google, apple, waze,
+  mapquest etc") that got built for `wifi-quality-app` but never ported here, the same
+  shared-pattern miss documented in the `cws` skill after the geolocation fix. Device default is
+  detected once (Apple on iOS/Mac-touch, Google on Android, Google otherwise), then the person's
+  choice is persisted to `localStorage` (`cwfqos_map_provider`).
+
 ## [1.2.0] - 2026-09-21
 
 ### Changed
