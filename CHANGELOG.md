@@ -3,6 +3,19 @@
 All notable changes to `cwfqosd` are documented here, in the
 [Keep a Changelog](https://keepachangelog.com/) style already used across the `*ispqos*` family.
 
+## [1.2.0] - 2026-09-21
+
+### Changed
+- Removed the header "eyebrow" line (`cwfqosd · public demo · OpenStreetMap · Nominatim ·
+  Overpass · Zippopotam — free & open, no API keys`) — the 1.1.0 release stripped the footer's
+  OSM/Nominatim/Overpass attribution paragraph, but this shorter header line carrying the same
+  substance was missed in that pass and only caught when Ed compared the live site against a
+  changelog entry that described the page as fully stripped. It wasn't. This entry is the fix.
+  The page's Leaflet/OpenStreetMap tile-attribution control (bottom-right of the map itself)
+  remains — that's the library's built-in, required attribution for using OSM's map tiles at all,
+  separate from the written disclaimer text that's now been removed twice over (footer, then
+  header).
+
 ## [1.1.0] - 2026-09-21
 
 ### Added
